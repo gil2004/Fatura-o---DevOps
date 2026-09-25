@@ -17,7 +17,7 @@ def calcular_totais(linhas):
     """Devolve (linhas_calculadas, subtotal, iva, total). Lança ValueError se inválido."""
     if not linhas:
         raise ValueError("A fatura tem de ter pelo menos uma linha")
-    subtotal = iva = Decimal("0")
+    subtotal = iva = Decimal(0)
     resultado = []
     for linha in linhas:
         quantidade = Decimal(str(linha.get("quantidade", 0)))

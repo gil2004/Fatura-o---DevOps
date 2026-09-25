@@ -1,0 +1,26 @@
+name: Pipeline CI/CD
+
+on:
+  push:
+    branches: [develop, main]
+    tags: ["v*"]
+
+jobs:
+  dev:
+    name: DEV - lint e testes unitários
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Testes unitários clientes-service
+        working-directory: clientes-service
+        run: python -m pytest -v --cov=app
+      - name: Testes unitários faturas-service
+        working-directory: faturas-service
+        run: python -m pytest -v --cov=app

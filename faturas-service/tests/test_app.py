@@ -1,6 +1,5 @@
 import pytest
 import requests
-
 from app import CLIENTES_URL, calcular_totais, create_app
 
 CLIENTE = {"nif": "501964843", "nome": "Empresa Exemplo, Lda", "email": "geral@exemplo.pt"}
