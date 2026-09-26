@@ -43,3 +43,23 @@ jobs:
           sleep 3
       - name: Testes de integração
         run: python -m pytest -v tests/integracao
+
+      prd:
+        name: PRD - smoke tests
+        needs: stg
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        environment: prd
+        steps:
+          - uses: actions/checkout@v5
+          - uses: actions/setup-python@v6
+            with:
+                python-version: "3.12" 
+          - run: pip install -r requirements.txt
+          - name: Arrancar os serviços
+            run: |
+              gunicorn --chdir clientes-service -b 0.0.0.0:5001 --daemon app:app
+              CLIENTES_URL=http://localhost:5001 gunicorn --chdir faturas-service -b 0.0.0.0:5002 --daemon app:app
+              sleep 3
+          - name: Smoke tests
+            run: python -m pytest -v tests/smoke    
