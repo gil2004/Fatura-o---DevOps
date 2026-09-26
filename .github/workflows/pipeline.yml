@@ -3,7 +3,6 @@ name: Pipeline CI/CD
 on:
   push:
     branches: [develop, main]
-    tags: ["v*"]
 
 jobs:
   dev:
@@ -24,3 +23,23 @@ jobs:
       - name: Testes unitários faturas-service
         working-directory: faturas-service
         run: python -m pytest -v --cov=app
+
+  stg:
+    name: STG - testes de integração
+    needs: dev
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: stg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Arrancar os serviços
+        run: |
+          gunicorn --chdir clientes-service -b 0.0.0.0:5001 --daemon app:app
+          CLIENTES_URL=http://localhost:5001 gunicorn --chdir faturas-service -b 0.0.0.0:5002 --daemon app:app
+          sleep 3
+      - name: Testes de integração
+        run: python -m pytest -v tests/integracao
