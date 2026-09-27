@@ -1,0 +1,25 @@
+services:
+  clientes-service:
+    build:
+      context: .
+      dockerfile: clientes-service/Dockerfile
+    ports:
+      - "${CLIENTES_PORT:-5001}:5001"
+    networks:
+      - faturacao-net
+
+  faturas-service:
+    build:
+      context: .
+      dockerfile: faturas-service/Dockerfile
+    environment:
+      CLIENTES_URL: http://clientes-service:5001
+    ports:
+      - "${FATURAS_PORT:-5002}:5002"
+    depends_on:
+      - clientes-service
+    networks:
+      - faturacao-net
+
+networks:
+  faturacao-net:
