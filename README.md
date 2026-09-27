@@ -32,7 +32,7 @@ O ciclo de entrega funciona assim:
 
 ## 2. Desenho da arquitetura
 
-![Arquitetura HLD](docs/20260923-HLD-ProjetoFinal-DevOps.drawio.png)
+![Arquitetura HLD](fotos/passo1_desenho_arquitetura.png)
 
 O diagrama tem três blocos:
 
@@ -43,18 +43,18 @@ O diagrama tem três blocos:
 ## 3. Estrutura do repositório
 
 ```
-├── .github/workflows/pipeline.yml   # pipeline CI/CD
+├── .github/workflows/pipeline.yml     # pipeline CI/CD
 ├── clientes-service/
 │   ├── app.py
-│   └── tests/test_app.py            # testes unitários (DEV)
+│   └── tests/test_app.py              # testes unitários (DEV)
 ├── faturas-service/
 │   ├── app.py
-│   └── tests/test_app.py            # testes unitários (DEV)
+│   └── tests/test_app.py              # testes unitários (DEV)
 ├── tests/
 │   ├── integracao/test_integracao.py  # testes de integração (STG)
 │   └── smoke/test_smoke.py            # smoke tests (PRD)
-├── docs/                            # diagrama da arquitetura
-├── fotos/                           # evidências
+├── docs/                              # diagrama da arquitetura
+├── fotos/                             # evidências
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -82,7 +82,7 @@ O diagrama tem três blocos:
 
 - **Domínio de faturação:** tem regras de negócio úteis de testar (validação do NIF,
   taxas de IVA portuguesas de 0, 6, 13 e 23%) sem complicar a arquitetura.
-- **Dados em memória:** o foco do projeto é o pipeline de entrega.
+- **Dados em memória:** o foco do projeto é o pipeline de entrega, não a persistência.
 - **Docker Compose em vez de Kubernetes:** cumpre o requisito de orquestração com
   menos complexidade.
 - **Um único `requirements.txt`** na raiz, partilhado pelos dois serviços.
@@ -110,8 +110,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-![pip install](fotos/01-pip-install.png)
-
 ### Passo 2 — Testes unitários do clientes-service
 
 ```bash
@@ -121,7 +119,7 @@ python3 -m pytest -v --cov=app
 
 Resultado: **15 testes aprovados, 95% de cobertura.**
 
-![Testes clientes-service](fotos/03-testes-clientes.png)
+![Testes clientes-service](fotos/passo5_dev_clientes.png)
 
 ### Passo 3 — Testes unitários do faturas-service
 
@@ -132,7 +130,7 @@ python3 -m pytest -v --cov=app
 
 Resultado: **9 testes aprovados, 91% de cobertura.**
 
-![Testes faturas-service](fotos/04-testes-faturas.png)
+![Testes faturas-service](fotos/passo5_dev_faturas.png)
 
 ### Passo 4 — Comunicação entre os microsserviços
 
@@ -147,7 +145,7 @@ curl -X POST localhost:5002/api/faturas -H "Content-Type: application/json" \
 O faturas-service consultou o clientes-service (`GET /api/clientes/501964843` → 200)
 e devolveu a fatura em JSON, com o total de 246.0 €.
 
-![Comunicação entre serviços](fotos/05-servicos-juntos.png)
+![Comunicação entre serviços](fotos/passo2.png)
 
 ### Passo 5 — Repositório local e remoto (GitHub)
 
@@ -162,6 +160,8 @@ git checkout -b develop
 git push -u origin develop
 ```
 
+![Repositório GitHub](fotos/passo3.png)
+
 ### Passo 6 — Pipeline GitHub Actions com ambientes DEV, STG e PRD
 
 **6.1 — Ambientes personalizados.** Em *Settings → Environments* foram criados os
@@ -172,7 +172,7 @@ uma aprovação manual antes do deploy em produção.
 que corre em cada push para a `develop` ou para a `main`: instala as dependências,
 executa o lint com ruff e os testes unitários dos dois serviços.
 
-![Pipeline DEV](fotos/07-pipeline-dev.png)
+![Pipeline DEV](fotos/passo4.png)
 
 **6.3 — Ambiente STG.** Foram criados os testes de integração em `tests/integracao/`,
 que fazem pedidos HTTP reais aos dois serviços. Foram primeiro validados localmente:
@@ -183,12 +183,12 @@ python3 -m pytest -v tests/integracao
 
 Resultado: **3 testes aprovados.**
 
-![Testes de integração local](fotos/06-testes-integracao-local.png)
+![Testes de integração local](fotos/passo5_stg.png)
 
 No pipeline, o job STG só corre na `main` e depois de o DEV passar (`needs: dev`).
 Arranca os serviços com gunicorn e executa os testes de integração.
 
-![Pipeline STG](fotos/09-pipeline-stg.png)
+![Pipeline STG](fotos/passo4_stg.png)
 
 **6.4 — Ambiente PRD.** Foram criados os smoke tests em `tests/smoke/`, que verificam
 rapidamente se os serviços estão ativos e se a funcionalidade principal responde:
@@ -199,14 +199,12 @@ python3 -m pytest -v tests/smoke
 
 Resultado: **3 testes aprovados.**
 
-![Smoke tests local](fotos/10-smoke-local.png)
+![Smoke tests local](fotos/passo5_prd.png)
 
 O job PRD corre depois do STG e fica à espera de aprovação manual. Depois de
 aprovado, arranca os serviços e executa os smoke tests.
 
-![Aprovação PRD](fotos/11-aprovacao-prd.png)
-
-![Pipeline completo](fotos/12-pipeline-completo.png)
+![Pipeline PRD](fotos/passo4_prd.png)
 
 **Fluxo de trabalho:**
 
@@ -254,10 +252,7 @@ git checkout develop
 | Nome do repositório ficou `Fatura-o---DevOps` | o GitHub não aceita caracteres como "ç" e "ã" nos nomes | evitar acentos em nomes de repositórios, pastas e ficheiros |
 | STG falhou: `file or directory not found: tests/integracao` | a pasta foi renomeada (sem acentos) mas a alteração não entrou no commit | `git add -A` para incluir ficheiros renomeados e apagados |
 | Aviso de Node.js 20 obsoleto no GitHub Actions | versões antigas das actions | atualizar para `actions/checkout@v5` e `actions/setup-python@v6` |
-
-![Erro pytest](fotos/02-erro-pytest-modulo.png)
-
-![Erro STG](fotos/08-erro-stg-pasta.png)
+| Imagens de exercícios anteriores não eram apagadas | containers parados ainda as usavam | `docker container prune` antes de `docker rmi` |
 
 ## 9. Utilização de ferramentas de IA
 
