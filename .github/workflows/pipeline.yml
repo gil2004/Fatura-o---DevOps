@@ -36,13 +36,15 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Arrancar os serviços
+      - name: Arrancar os containers
         run: |
-          gunicorn --chdir clientes-service -b 0.0.0.0:5001 --daemon app:app
-          CLIENTES_URL=http://localhost:5001 gunicorn --chdir faturas-service -b 0.0.0.0:5002 --daemon app:app
-          sleep 3
+          docker compose up -d --build
+          sleep 5
       - name: Testes de integração
         run: python -m pytest -v tests/integracao
+      - name: Parar os containers
+        if: always()
+        run: docker compose down  
 
   prd:
     name: PRD - smoke tests
@@ -56,10 +58,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Arrancar os serviços
+      - name: Arrancar os containers
         run: |
-          gunicorn --chdir clientes-service -b 0.0.0.0:5001 --daemon app:app
-          CLIENTES_URL=http://localhost:5001 gunicorn --chdir faturas-service -b 0.0.0.0:5002 --daemon app:app
-          sleep 3
+          docker compose up -d --build
+          sleep 5
       - name: Smoke tests
         run: python -m pytest -v tests/smoke
+      - name: Parar os containers
+        if: always()
+        run: docker compose down  
