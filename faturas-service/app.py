@@ -5,6 +5,25 @@ from decimal import ROUND_HALF_UP, Decimal
 import requests
 from flask import Flask, jsonify, request
 
+
+
+def configurar_tracing(app):
+    """Ativa o OpenTelemetry só se OTEL_EXPORTER_OTLP_ENDPOINT estiver definido."""
+    if not os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        return
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.flask import FlaskInstrumentor
+    from opentelemetry.instrumentation.requests import RequestsInstrumentor
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    provider = TracerProvider()
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
+    FlaskInstrumentor().instrument_app(app)
+    RequestsInstrumentor().instrument()
+
 CLIENTES_URL = os.getenv("CLIENTES_URL", "http://localhost:5001")
 TAXAS_IVA = {0, 6, 13, 23}
 
@@ -45,6 +64,7 @@ def calcular_totais(linhas):
 def create_app():
     app = Flask(__name__)
     app.json.ensure_ascii = False
+    configurar_tracing(app)
     faturas = {}
 
     @app.get("/health")

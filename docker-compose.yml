@@ -3,8 +3,13 @@ services:
     build:
       context: .
       dockerfile: clientes-service/Dockerfile
+    environment:
+      OTEL_SERVICE_NAME: clientes-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318  
     ports:
-      - "${CLIENTES_PORT:-5001}:5001"
+      - "5001:5001"
+    depends_on:
+      - jaeger  
     networks:
       - faturacao-net
 
@@ -14,10 +19,20 @@ services:
       dockerfile: faturas-service/Dockerfile
     environment:
       CLIENTES_URL: http://clientes-service:5001
+      OTEL_SERVICE_NAME: faturas-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     ports:
-      - "${FATURAS_PORT:-5002}:5002"
+      - "5002:5002"
     depends_on:
       - clientes-service
+      - jaeger
+    networks:
+      - faturacao-net
+
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    ports:
+      - "16686:16686"
     networks:
       - faturacao-net
 

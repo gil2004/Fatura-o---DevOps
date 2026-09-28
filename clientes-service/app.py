@@ -1,6 +1,26 @@
 """clientes-service: gestão de clientes e validação de NIF."""
 from flask import Flask, jsonify, request
 
+import os
+
+
+def configurar_tracing(app):
+    """Ativa o OpenTelemetry só se OTEL_EXPORTER_OTLP_ENDPOINT estiver definido."""
+    if not os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        return
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.flask import FlaskInstrumentor
+    from opentelemetry.instrumentation.requests import RequestsInstrumentor
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    provider = TracerProvider()
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
+    FlaskInstrumentor().instrument_app(app)
+    RequestsInstrumentor().instrument()
+
 
 def nif_valido(nif: str) -> bool:
     """Valida um NIF português (9 dígitos + dígito de controlo)."""
@@ -18,6 +38,7 @@ def nif_valido(nif: str) -> bool:
 def create_app():
     app = Flask(__name__)
     app.json.ensure_ascii = False
+    configurar_tracing(app)
     clientes = {
         "501964843": {"nif": "501964843", "nome": "Empresa Exemplo, Lda", "email": "geral@exemplo.pt"},
         "123456789": {"nif": "123456789", "nome": "João Silva", "email": "joao@mail.pt"},
