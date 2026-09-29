@@ -33,14 +33,6 @@ servicos-local:
 	kill $$(cat .clientes.pid) $$(cat .faturas.pid)
 	rm -f .clientes.pid .faturas.pid
 
-pipeline:
-	git checkout develop
-	git push
-	git checkout main
-	git merge develop
-	git push
-	git checkout develop
-
 docker:
 	docker compose up -d --build
 	docker compose ps
