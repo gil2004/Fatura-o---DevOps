@@ -3,106 +3,57 @@
 **Autor:** Gil Alves · **Curso:** DevOps Engineering — Tokio School
 **Repositório:** https://github.com/gil2004/Fatura-o---DevOps
 
----
+## 1. Introdução
 
-## 1. Introdução — Arquitetura do pipeline de entrega contínua
+Pipeline de entrega contínua para uma aplicação de faturação com dois microsserviços
+Python (Flask), que comunicam por HTTP com respostas em JSON:
 
-Este projeto implementa um pipeline de entrega contínua para uma aplicação web Python
-baseada em microsserviços. A aplicação simula um sistema de faturação composto por
-dois serviços que comunicam entre si por HTTP, com respostas em formato JSON:
+- **clientes-service** (5001) — gestão de clientes e validação do NIF.
+- **faturas-service** (5002) — emissão de faturas; consulta o clientes-service e calcula o IVA.
 
-- **clientes-service** (porta 5001) — gestão de clientes e validação do NIF português.
-- **faturas-service** (porta 5002) — emissão de faturas; consulta o clientes-service
-  e calcula a base, o IVA e o total.
+Os serviços correm em containers orquestrados com Docker Compose, e as transações
+entre eles são rastreadas com Jaeger (OpenTelemetry). O pipeline, em GitHub Actions,
+tem três ambientes:
 
-O ciclo de entrega funciona assim:
-
-1. O código é desenvolvido localmente, num ambiente virtual Python (venv), e testado com pytest.
-2. As alterações são enviadas para o GitHub (`git push`).
-3. O GitHub Actions executa o pipeline, com um ambiente personalizado por fase:
-
-| Branch | Jobs executados | Testes |
+| Branch | Jobs | Testes |
 |---|---|---|
 | `develop` | DEV | lint (ruff) + testes unitários |
-| `main` | DEV → STG → PRD | + testes de integração (STG) + smoke tests (PRD) |
+| `main` | DEV → STG → PRD | + integração (STG) + smoke tests e tracing (PRD, com aprovação manual) |
 
-4. O deploy em **PRD** exige aprovação manual, configurada no GitHub Environment `prd`.
-5. Os containers são orquestrados com Docker Compose e as transações entre os
-   serviços são rastreadas com Jaeger (OpenTelemetry).
+## 2. Arquitetura
 
-## 2. Desenho da arquitetura
+![Arquitetura HLD](fotos/Desenho_arquitetura_projetofinal.drawio.png)
 
-![Arquitetura HLD](fotos/passo1_desenho_arquitetura.png)
+## 3. Ferramentas e bibliotecas
 
-O diagrama tem três blocos:
-
-- **Máquina local** — VS Code, venv, pytest e Docker Compose.
-- **GitHub** — o repositório e o pipeline DEV → STG → PRD.
-- **Stack Docker Compose** — faturas-service → clientes-service, com envio de traces para o Jaeger.
-
-## 3. Estrutura do repositório
-
-```
-├── .github/workflows/pipeline.yml     # pipeline CI/CD
-├── clientes-service/
-│   ├── app.py
-│   └── tests/test_app.py              # testes unitários (DEV)
-├── faturas-service/
-│   ├── app.py
-│   └── tests/test_app.py              # testes unitários (DEV)
-├── tests/
-│   ├── integracao/test_integracao.py  # testes de integração (STG)
-│   └── smoke/test_smoke.py            # smoke tests (PRD)
-├── docs/                              # diagrama da arquitetura
-├── fotos/                             # evidências
-├── requirements.txt
-├── .gitignore
-└── README.md
-```
-
-## 4. Ferramentas e bibliotecas utilizadas
-
-| Ferramenta / biblioteca | Utilização |
+| Ferramenta | Utilização |
 |---|---|
-| Python 3.12 + venv | linguagem e ambiente virtual isolado |
-| Flask | framework das APIs REST |
-| requests | chamadas HTTP entre serviços e nos testes de integração |
-| gunicorn | servidor WSGI de produção |
-| pytest | framework de testes |
-| pytest-cov | medição da cobertura de código |
-| requests-mock | simulação do clientes-service nos testes unitários |
-| ruff | análise estática do código (lint) |
-| Git + GitHub | controlo de versões e repositório remoto |
-| GitHub Actions + Environments | pipeline CI/CD com os ambientes DEV, STG e PRD |
+| Python 3.12 + venv | linguagem e ambiente virtual |
+| Flask, requests, gunicorn | APIs, chamadas entre serviços, servidor de produção |
+| pytest, pytest-cov, requests-mock | testes, cobertura e simulação de serviços |
+| ruff | lint |
+| OpenTelemetry (sdk, exporter OTLP, instrumentação Flask e requests) | envio de traces |
+| GitHub + GitHub Actions + Environments | repositório e pipeline DEV/STG/PRD |
 | Docker + Docker Compose | containers e orquestração |
-| Jaeger + OpenTelemetry | rastreamento de transações entre microsserviços |
-| draw.io | desenho da arquitetura |
+| Jaeger v2 | visualização dos traces |
 
-## 5. Decisões de design
+## 4. Decisões de design
 
-- **Domínio de faturação:** tem regras de negócio úteis de testar (validação do NIF,
-  taxas de IVA portuguesas de 0, 6, 13 e 23%) sem complicar a arquitetura.
-- **Dados em memória:** o foco do projeto é o pipeline de entrega, não a persistência.
-- **Docker Compose em vez de Kubernetes:** cumpre o requisito de orquestração com
-  menos complexidade.
-- **Um único `requirements.txt`** na raiz, partilhado pelos dois serviços.
-- **Branches em vez de tags:** a `develop` é a área de trabalho e a `main` a linha de
-  entrega. A proteção de produção é feita pela aprovação manual do ambiente `prd`.
-- **Testes separados por fase:** unitários em DEV, integração em STG, smoke em PRD.
-- **Mocks nos testes unitários:** o faturas-service é testado sem depender do
-  clientes-service; a comunicação real é validada nos testes de integração.
-- **Ambientes simulados nos runners do GitHub:** cada job corre numa máquina virtual
-  nova, que é destruída no fim. Por isso, cada job arranca os serviços antes de os
-  testar. Numa empresa, cada ambiente seria um servidor permanente e o job faria o
-  deploy da nova versão para esse servidor.
-- **Padrão application factory (`create_app()`):** cada teste recebe uma instância
-  nova da aplicação, sem dados de testes anteriores.
-- **Tratamento de falhas entre serviços:** se o clientes-service estiver indisponível,
-  o faturas-service devolve 503 em vez de falhar.
+- **Docker Compose em vez de Kubernetes** — cumpre o requisito com menos complexidade.
+- **Branches em vez de tags** — `develop` para trabalho, `main` para entrega; produção
+  protegida pela aprovação manual do ambiente `prd`.
+- **Testes por fase** — unitários em DEV, integração em STG, smoke em PRD.
+- **Mocks nos testes unitários** — cada serviço é testado isoladamente.
+- **Dados em memória** — o foco é o pipeline, não a persistência.
+- **gunicorn nos containers** — o servidor do Flask é só para desenvolvimento.
+- **Tracing ativado por variável de ambiente** — só com `OTEL_EXPORTER_OTLP_ENDPOINT`
+  definida; os testes unitários não precisam do Jaeger.
+- **Ambientes simulados nos runners** — cada job arranca os containers numa máquina
+  nova do GitHub; numa empresa seriam servidores permanentes.
 
-## 6. Implementação — passos
+## 5. Passos de implementação
 
-### Passo 1 — Estrutura do projeto e ambiente virtual
+### Passo 1 — Ambiente virtual
 
 ```bash
 python3 -m venv venv
@@ -110,49 +61,32 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Passo 2 — Testes unitários do clientes-service
+### Passo 2 — Testes unitários
 
 ```bash
-cd clientes-service
-python3 -m pytest -v --cov=app
+cd clientes-service && python3 -m pytest -v --cov=app   # 15 testes, 95%
+cd ../faturas-service && python3 -m pytest -v --cov=app  # 9 testes, 91%
 ```
 
-Resultado: **15 testes aprovados, 95% de cobertura.**
 
-![Testes clientes-service](fotos/passo5_dev_clientes.png)
+### Passo 3 — Comunicação entre serviços
 
-### Passo 3 — Testes unitários do faturas-service
-
-```bash
-cd faturas-service
-python3 -m pytest -v --cov=app
-```
-
-Resultado: **9 testes aprovados, 91% de cobertura.**
-
-![Testes faturas-service](fotos/passo5_dev_faturas.png)
-
-### Passo 4 — Comunicação entre os microsserviços
-
-Os dois serviços foram arrancados em terminais separados (`python3 app.py`) e foi
-enviado um pedido de fatura:
+Com os dois serviços a correr (`python3 app.py` em cada pasta):
 
 ```bash
 curl -X POST localhost:5002/api/faturas -H "Content-Type: application/json" \
   -d '{"nif":"501964843","linhas":[{"descricao":"Consultoria","quantidade":2,"preco_unitario":100,"taxa_iva":23}]}'
 ```
 
-O faturas-service consultou o clientes-service (`GET /api/clientes/501964843` → 200)
-e devolveu a fatura em JSON, com o total de 246.0 €.
+O faturas-service consultou o clientes-service e devolveu a fatura com total de 246.0 €.
 
-![Comunicação entre serviços](fotos/passo2.png)
 
-### Passo 5 — Repositório local e remoto (GitHub)
+### Passo 4 — Repositório local e remoto
 
 ```bash
 git init
 git add .
-git commit -m "Microsserviços clientes e faturas com testes unitários"
+git commit -m "Microsserviços com testes"
 git branch -M main
 git remote add origin https://github.com/gil2004/Fatura-o---DevOps.git
 git push -u origin main
@@ -160,105 +94,90 @@ git checkout -b develop
 git push -u origin develop
 ```
 
-![Repositório GitHub](fotos/passo3.png)
+### Passo 5 — Pipeline com DEV, STG e PRD
 
-### Passo 6 — Pipeline GitHub Actions com ambientes DEV, STG e PRD
+Em *Settings → Environments* foram criados os ambientes `dev`, `stg` e `prd`
+(este com *Required reviewers*). O ficheiro `.github/workflows/pipeline.yml` define:
 
-**6.1 — Ambientes personalizados.** Em *Settings → Environments* foram criados os
-ambientes `dev`, `stg` e `prd`. O `prd` tem a regra *Required reviewers*, que obriga a
-uma aprovação manual antes do deploy em produção.
-
-**6.2 — Ambiente DEV.** O ficheiro `.github/workflows/pipeline.yml` define o job DEV,
-que corre em cada push para a `develop` ou para a `main`: instala as dependências,
-executa o lint com ruff e os testes unitários dos dois serviços.
-
-![Pipeline DEV](fotos/passo4.png)
-
-**6.3 — Ambiente STG.** Foram criados os testes de integração em `tests/integracao/`,
-que fazem pedidos HTTP reais aos dois serviços. Foram primeiro validados localmente:
+- **DEV** — lint e testes unitários, em qualquer push;
+- **STG** — só na `main`: `docker compose up`, testes de integração, `docker compose down`;
+- **PRD** — depois de aprovado: `docker compose up`, smoke tests, `docker compose down`.
 
 ```bash
-python3 -m pytest -v tests/integracao
-```
-
-Resultado: **3 testes aprovados.**
-
-![Testes de integração local](fotos/passo5_stg.png)
-
-No pipeline, o job STG só corre na `main` e depois de o DEV passar (`needs: dev`).
-Arranca os serviços com gunicorn e executa os testes de integração.
-
-![Pipeline STG](fotos/passo4_stg.png)
-
-**6.4 — Ambiente PRD.** Foram criados os smoke tests em `tests/smoke/`, que verificam
-rapidamente se os serviços estão ativos e se a funcionalidade principal responde:
-
-```bash
-python3 -m pytest -v tests/smoke
-```
-
-Resultado: **3 testes aprovados.**
-
-![Smoke tests local](fotos/passo5_prd.png)
-
-O job PRD corre depois do STG e fica à espera de aprovação manual. Depois de
-aprovado, arranca os serviços e executa os smoke tests.
-
-![Pipeline PRD](fotos/passo4_prd.png)
-
-**Fluxo de trabalho:**
-
-```bash
-# trabalho diário → DEV
-git checkout develop
-git add -A
-git commit -m "descrição"
-git push
-
+# trabalho → DEV
+git checkout develop && git add -A && git commit -m "..." && git push
 # entrega → DEV → STG → PRD
-git checkout main
-git merge develop
-git push
-git checkout develop
+git checkout main && git merge develop && git push && git checkout develop
 ```
 
-### Passo 7 — Containers com Docker Compose *(a completar)*
+### Passo 6 — Containers com Docker Compose
 
-### Passo 8 — Rastreamento com Jaeger *(a completar)*
+Cada serviço tem um Dockerfile (`python:3.12-slim`, utilizador sem privilégios,
+arranque com gunicorn). O `docker-compose.yml` liga os containers na rede
+`faturacao-net`, onde o faturas-service chega ao outro por `http://clientes-service:5001`.
 
-### Passo 9 — Paragem, destruição e limpeza da infraestrutura *(a completar)*
+```bash
+docker compose up -d --build
+python3 -m pytest -v tests/integracao   # 3 testes
+```
 
-## 7. Evidências dos testes
+### Passo 7 — Rastreamento com Jaeger
 
-| Teste | Ambiente | Resultado |
+Cada `app.py` tem a função `configurar_tracing()`, que instrumenta o Flask e o
+requests e envia os spans ao Jaeger. No `docker-compose.yml` foi acrescentado o
+container `jaegertracing/jaeger` e as variáveis `OTEL_SERVICE_NAME` e
+`OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318`.
+
+Em `http://localhost:16686`, cada fatura aparece como um trace com os spans dos dois
+serviços; os erros (por exemplo, NIF inexistente → 404) ficam assinalados.
+
+No pipeline, o smoke test `test_trace_chega_ao_jaeger` consulta a API do Jaeger
+(`/api/v3/traces`) e só passa se os dois serviços tiverem enviado spans.
+
+```bash
+python3 -m pytest -v tests/smoke   # 4 testes
+```
+
+### Passo 8 — Paragem, destruição e limpeza
+
+```bash
+docker compose down --rmi all -v      # containers, rede, imagens e volumes
+docker builder prune -f               # cache de build
+docker ps -a && docker images         # confirmar que não resta nada do projeto
+deactivate
+rm -rf venv .pytest_cache .ruff_cache
+find . -name "__pycache__" -type d -exec rm -rf {} +
+```
+
+No GitHub, os runners são destruídos automaticamente no fim de cada job. O repositório
+e os ambientes mantêm-se por fazerem parte da entrega.
+
+## 6. Evidências
+
+| Teste | Onde | Resultado |
 |---|---|---|
-| Unitários clientes-service | local + DEV | 15 aprovados · 95% cobertura |
-| Unitários faturas-service | local + DEV | 9 aprovados · 91% cobertura |
-| Comunicação entre serviços (curl) | local | fatura criada com sucesso (201) |
+| Unitários clientes / faturas | local + DEV | 15 + 9 aprovados |
 | Integração | local + STG | 3 aprovados |
-| Smoke tests | local + PRD | 3 aprovados |
+| Smoke + tracing | local + PRD | 4 aprovados |
+| Trace com os dois serviços | Jaeger | 3 spans no mesmo trace |
 
-## 8. Problemas encontrados
+## 7. Problemas encontrados
 
-| Problema | Causa | Solução |
-|---|---|---|
-| `ModuleNotFoundError: No module named 'app'` ao correr `pytest` | o comando `pytest` não adiciona a pasta atual ao caminho de importação | usar `python3 -m pytest` |
-| `ModuleNotFoundError: No module named 'flask'` num terminal novo | o venv não estava ativo nesse terminal | `source venv/bin/activate` em cada terminal |
-| `flask` sublinhado no VS Code | o VS Code não usava o interpretador do venv | *Python: Select Interpreter* → `./venv/bin/python` |
-| Acentos no JSON apareciam como `\u00e3` | o Flask escapa caracteres não-ASCII por defeito | `app.json.ensure_ascii = False` |
-| Repositório Git criado dentro de `clientes-service` | `git init` executado na pasta errada | apagar `clientes-service/.git` e repetir na raiz |
-| `error: pathspec 'develop' did not match` | a branch `develop` não existia depois de recriar o repositório | `git checkout -b develop` |
-| Ruff com resultados diferentes no PC e no CI | estava a ser usado um ruff instalado no sistema, com outra configuração | usar o ruff do venv e corrigir com `ruff check . --fix` |
-| Nome do repositório ficou `Fatura-o---DevOps` | o GitHub não aceita caracteres como "ç" e "ã" nos nomes | evitar acentos em nomes de repositórios, pastas e ficheiros |
-| STG falhou: `file or directory not found: tests/integracao` | a pasta foi renomeada (sem acentos) mas a alteração não entrou no commit | `git add -A` para incluir ficheiros renomeados e apagados |
-| Aviso de Node.js 20 obsoleto no GitHub Actions | versões antigas das actions | atualizar para `actions/checkout@v5` e `actions/setup-python@v6` |
-| Imagens de exercícios anteriores não eram apagadas | containers parados ainda as usavam | `docker container prune` antes de `docker rmi` |
+| Problema | Solução |
+|---|---|
+| `No module named 'app'` ao correr `pytest` | usar `python3 -m pytest` |
+| `No module named 'flask'` num terminal novo | ativar o venv em cada terminal |
+| Acentos no JSON como `\u00e3` | `app.json.ensure_ascii = False` |
+| `git init` feito dentro de `clientes-service` | apagar `clientes-service/.git` e repetir na raiz |
+| Ruff diferente no PC e no CI | usar o ruff do venv e `ruff check . --fix` |
+| STG falhou: pasta `tests/integracao` não encontrada | a pasta renomeada não entrou no commit; `git add -A` |
+| Aviso de Node.js 20 no Actions | `checkout@v5` e `setup-python@v6` |
+| `docker build` falhou com `clientes_service` | o nome da pasta é `clientes-service` |
+| API do Jaeger devolvia 404 | o Jaeger v2 usa `/api/v3/traces` e não `/api/traces` |
 
-## 9. Utilização de ferramentas de IA
 
-Durante o projeto foi utilizado o Claude (Anthropic) como ferramenta de apoio na
-proposta de arquitetura, no código base dos serviços e na estrutura deste relatório.
-A escolha do domínio, a simplificação da arquitetura (Docker Compose em vez de
-Kubernetes, branches em vez de tags), a implementação, a execução dos testes, a
-resolução dos problemas encontrados e a validação de todo o trabalho foram feitas
-pelo autor.
+## 8. Utilização de IA
+
+Foi utilizado o Claude (Anthropic) como apoio na proposta de arquitetura, no código
+base e na estrutura deste relatório. As decisões, a implementação, os testes e a
+resolução dos problemas foram feitos pelo autor.
